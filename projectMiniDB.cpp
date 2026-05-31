@@ -7,6 +7,21 @@
 #include <functional> // For function wrapper
 #include <queue>
 #include <condition_variable> 
+#include <fstream>    // For file handling
+#include <sstream>    // Include this for stringstream
+
+class Logger {
+    std::ofstream logFile;                     // logFile is a file stream object (write only)
+public:
+    Logger(const std::string& filename) {
+        logFile.open(filename, std::ios::app); // Open in append mode
+    }
+
+    void log(const std::string& key, const std::string& val) {
+        logFile << key << "," << val << "\n";
+        logFile.flush();                       // Ensure it actually writes to disk!
+    }
+};
 
 class ThreadPool {
 private:
@@ -63,25 +78,50 @@ private:
     };
     std::stack<Transaction> transaction_stack;
     std::mutex mtx;
+    Logger logger{"db.log"}; // Important! otherwise, recover() will not work,, Opens the file
 
 public:
+    MiniDB() {
+        recover();
+    }
+
+    void recover() {
+        std::ifstream logFile("db.log");
+        std::string line;
+
+        // Lock the mutex because we are modifying 'data' during recovery
+        std::lock_guard<std::mutex> lock(mtx);
+        while(std::getline(logFile, line)) {
+            std::stringstream ss(line);
+            std::string key, value;
+
+            // Read until the comma
+            if(std::getline(ss, key, ',') && std::getline(ss, value)) {
+                data[key] = value; // Reconstruct the state
+            }
+        }
+    }
+
     bool isTransactionActive () {
         return (!transaction_stack.empty());
     }
 
     void set(std::string key, std::string value) {
-        std::lock_guard<std::mutex> lock(mtx);
-        if (isTransactionActive()) {
-            auto& current_txn = transaction_stack.top();                       // If transaction stack is not empty, we are extracting the top one
-            if(current_txn.undo_log.find(key) == current_txn.undo_log.end()) { // Not found in logs
-                if(data.find(key) != data.end()) {                             // Found in data
-                    current_txn.undo_log[key] = data[key];                     // Backup
-                } else {
-                    current_txn.undo_log[key] = "__DELETE__";                  // This will be deleted on rollback, becoz we created this key, new 
+        logger.log(key, value); // Storing in file 
+        {
+            std::lock_guard<std::mutex> lock(mtx);
+            if (isTransactionActive()) {
+                auto& current_txn = transaction_stack.top();                       // If transaction stack is not empty, we are extracting the top one
+                if(current_txn.undo_log.find(key) == current_txn.undo_log.end()) { // Not found in logs
+                    if(data.find(key) != data.end()) {                             // Found in data
+                        current_txn.undo_log[key] = data[key];                     // Backup
+                    } else {
+                        current_txn.undo_log[key] = "__DELETE__";                  // This will be deleted on rollback, becoz we created this key, new 
+                    }
                 }
             }
+            data[key] = value;
         }
-        data[key] = value;
     }
 
     std::string get(std::string key) {
