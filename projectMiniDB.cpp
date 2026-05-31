@@ -11,15 +11,17 @@
 #include <sstream>    // Include this for stringstream
 
 class Logger {
-    std::ofstream logFile;                     // logFile is a file stream object (write only)
+    std::ofstream logFile;                        // logFile is a file stream object (write only)
+    std::mutex logMtx;
 public:
     Logger(const std::string& filename) {
-        logFile.open(filename, std::ios::app); // Open in append mode
+        logFile.open(filename, std::ios::app);    // Open in append mode
     }
 
     void log(const std::string& key, const std::string& val) {
+        std::lock_guard<std::mutex> lock(logMtx); // Only one thread writes at a time
         logFile << key << "," << val << "\n";
-        logFile.flush();                       // Ensure it actually writes to disk!
+        logFile.flush();                          // Ensure it actually writes to disk!
     }
 };
 
@@ -166,9 +168,9 @@ void safePrint(const std::string& msg) { // For clear output in terminal
 
 int main() {
     MiniDB mydb;
-    ThreadPool pool(4); // Create the pool
+    ThreadPool pool(1000); // Create the pool
 
-    for (int i=1; i<=100; i++) {
+    for (int i=1; i<=1000; i++) {
         pool.enqueue([&mydb, i]() {
             if(i%3==0) {
                 mydb.begin();
@@ -182,6 +184,10 @@ int main() {
             safePrint("Therad finished task for: " + std::to_string(i));
         });
     }
+
+    pool.enqueue([&mydb]() {
+        safePrint(mydb.get(std::to_string(70)));
+    });
 
     // After this, the ThreadPool will go out of scope, 
     // trigger the destructor, and shut down cleanly.
