@@ -23,6 +23,10 @@ public:
         logFile << key << "," << val << "\n";
         logFile.flush();                          // Ensure it actually writes to disk!
     }
+
+    ~Logger() {
+        logFile.close();
+    }
 };
 
 class ThreadPool {
@@ -105,6 +109,7 @@ public:
     }
 
     bool isTransactionActive () {
+        std::lock_guard<std::mutex> lock(mtx);
         return (!transaction_stack.empty());
     }
 
@@ -112,7 +117,7 @@ public:
         logger.log(key, value); // Storing in file 
         {
             std::lock_guard<std::mutex> lock(mtx);
-            if (isTransactionActive()) {
+            if (!transaction_stack.empty()) {
                 auto& current_txn = transaction_stack.top();                       // If transaction stack is not empty, we are extracting the top one
                 if(current_txn.undo_log.find(key) == current_txn.undo_log.end()) { // Not found in logs
                     if(data.find(key) != data.end()) {                             // Found in data
@@ -132,7 +137,11 @@ public:
     }
 
     void commit() {
-        transaction_stack.pop();
+        std::lock_guard<std::mutex> lock(mtx);
+
+        if(!transaction_stack.empty()) {
+            transaction_stack.pop();
+        }
     }
 
     // Begin a new transaction
@@ -144,7 +153,7 @@ public:
     // Rollback to the last transaction
     void rollback() {
         std::lock_guard<std::mutex> lock(mtx);
-        if(isTransactionActive()) {
+        if(!transaction_stack.empty()) {
             auto& current_txn = transaction_stack.top(); // If transaction stack is not empty, we are extracting the top one
             
             // Revert cahnges from the log
@@ -168,7 +177,7 @@ void safePrint(const std::string& msg) { // For clear output in terminal
 
 int main() {
     MiniDB mydb;
-    ThreadPool pool(1000); // Create the pool
+    ThreadPool pool(std::thread::hardware_concurrency()); // Create the pool of size = cores in the system
 
     for (int i=1; i<=1000; i++) {
         pool.enqueue([&mydb, i]() {
@@ -181,13 +190,23 @@ int main() {
             else {
                 mydb.rollback();
             }
-            safePrint("Therad finished task for: " + std::to_string(i));
+            safePrint("Thread finished task for: " + std::to_string(i));
         });
     }
 
-    pool.enqueue([&mydb]() {
-        safePrint(mydb.get(std::to_string(70)));
-    });
+    // pool.enqueue([&mydb]() {
+    //     mydb.set("A", "100");
+    //     mydb.begin();
+    //     mydb.set("A", "200");
+    //     mydb.set("B", "500");
+    //     mydb.rollback();
+    //     safePrint(mydb.get("A"));
+    //     safePrint(mydb.get("B"));
+    //     });
+
+    // pool.enqueue([&mydb]() {
+    //     safePrint(mydb.get(std::to_string(70)));
+    // });
 
     // After this, the ThreadPool will go out of scope, 
     // trigger the destructor, and shut down cleanly.
