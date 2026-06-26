@@ -95,7 +95,7 @@ public:
     }
 
     // thread id finder
-    const std::thread::id currentThread() const {
+    static std::thread::id currentThread() {
         return std::this_thread::get_id();
     }
 
@@ -132,7 +132,7 @@ public:
         return !it->second.empty();          // if id found, check for emptiness
     }
 
-    void set(std::string key, std::string value) {
+    void set(const std::string& key, const std::string& value) {
         logger.log(key, value); // Storing in file 
         {
             std::lock_guard<std::mutex> lock(mtx);
@@ -155,9 +155,16 @@ public:
         }
     }
 
-    std::string get(std::string key) {
+    std::string get(const std::string& key) {
         std::lock_guard<std::mutex> lock(mtx);
-        return data.count(key) ? data[key] : "NULL";
+
+        auto it = data.find(key);
+
+        if(it != data.end()) {
+            return it->second;
+        }
+
+        return "NULL";
     }
 
     void commit() {
@@ -168,11 +175,29 @@ public:
         auto it = transaction_stacks.find(id);
 
 
-        if(it != transaction_stacks.end() && !it->second.empty()) {
+        if(it == transaction_stacks.end() || it->second.empty()) {
+            return;
+        }
+
+            // If only one transaction
+        if(it->second.size() == 1) {
             it->second.pop();                 // Remove the top element
 
             if(it->second.empty()) {          // If stack becomes empty, erase the whole stack
                 transaction_stacks.erase(it);
+            }
+        } 
+        else {
+            // Save the child
+            auto child = std::move(it->second.top());
+            it->second.pop();
+
+            auto& parent = it->second.top();
+
+            for(const auto& [key, oldValue] : child.undo_log) {
+                if(parent.undo_log.find(key) == parent.undo_log.end()) {
+                    parent.undo_log[key] = oldValue;
+                }
             }
         }
     }
@@ -184,7 +209,7 @@ public:
         auto& txnStack = transaction_stacks[currentThread()];
 
         // emplace() constructs the object directly inside the stack (No temp copy)
-        txnStack.emplace(Transaction()); // Initialize a new transaction object
+        txnStack.emplace(); 
     }
 
     // Rollback to the last transaction
