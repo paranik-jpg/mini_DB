@@ -82,13 +82,21 @@ private:
     struct Transaction {
         std::unordered_map<std::string, std::string> undo_log;
     };
-    std::stack<Transaction> transaction_stack;
+
+    // Separate stacks for different threads
+    // std::thread::id is a type used to store 'id'
+    std::unordered_map<std::thread::id, std::stack<Transaction>> transaction_stacks;
     std::mutex mtx;
     Logger logger{"db.log"}; // Important! otherwise, recover() will not work,, Opens the file
 
 public:
     MiniDB() {
         recover();
+    }
+
+    // thread id finder
+    const std::thread::id currentThread() const {
+        return std::this_thread::get_id();
     }
 
     void recover() {
@@ -110,15 +118,31 @@ public:
 
     bool isTransactionActive () {
         std::lock_guard<std::mutex> lock(mtx);
-        return (!transaction_stack.empty());
+
+        // this_thread::get_id() returns current thread's id
+        auto id = currentThread();
+        auto it = transaction_stacks.find(id);
+
+        // auto& txnStack = transaction_stacks[std::this_thread::get_id()]; omitted becpz this will create a stack if not available
+        
+        if(it == transaction_stacks.end()) { // if id not found
+            return false;
+        }
+
+        return !it->second.empty();          // if id found, check for emptiness
     }
 
     void set(std::string key, std::string value) {
         logger.log(key, value); // Storing in file 
         {
             std::lock_guard<std::mutex> lock(mtx);
-            if (!transaction_stack.empty()) {
-                auto& current_txn = transaction_stack.top();                       // If transaction stack is not empty, we are extracting the top one
+
+            // This will not create extra vac memo
+            auto id = currentThread();
+            auto it = transaction_stacks.find(id);
+
+            if (it != transaction_stacks.end() && !it->second.empty()) {
+                auto& current_txn = it->second.top();                       // If transaction stack is not empty, we are extracting the top one
                 if(current_txn.undo_log.find(key) == current_txn.undo_log.end()) { // Not found in logs
                     if(data.find(key) != data.end()) {                             // Found in data
                         current_txn.undo_log[key] = data[key];                     // Backup
@@ -139,32 +163,51 @@ public:
     void commit() {
         std::lock_guard<std::mutex> lock(mtx);
 
-        if(!transaction_stack.empty()) {
-            transaction_stack.pop();
+        // This will not create extra vac memo
+        auto id = currentThread();
+        auto it = transaction_stacks.find(id);
+
+
+        if(it != transaction_stacks.end() && !it->second.empty()) {
+            it->second.pop();                 // Remove the top element
+
+            if(it->second.empty()) {          // If stack becomes empty, erase the whole stack
+                transaction_stacks.erase(it);
+            }
         }
     }
 
     // Begin a new transaction
     void begin() {
         std::lock_guard<std::mutex> lock(mtx);
-        transaction_stack.push(Transaction()); // Initialize a new transaction object
+
+        auto& txnStack = transaction_stacks[currentThread()];
+
+        // emplace() constructs the object directly inside the stack (No temp copy)
+        txnStack.emplace(Transaction()); // Initialize a new transaction object
     }
 
     // Rollback to the last transaction
     void rollback() {
         std::lock_guard<std::mutex> lock(mtx);
-        if(!transaction_stack.empty()) {
-            auto& current_txn = transaction_stack.top(); // If transaction stack is not empty, we are extracting the top one
+        auto id = currentThread();
+        auto it = transaction_stacks.find(id);
+        if(it != transaction_stacks.end() && !it->second.empty()) {
+            auto& current_txn = it->second.top(); // If transaction stack is not empty, we are extracting the top one
             
             // Revert cahnges from the log
             for(auto const& [key, old_val] : current_txn.undo_log) {
                 if (old_val == "__DELETE__") {
-                    data.erase(key);     // If not present earlier, remove now
+                    data.erase(key);          // If not present earlier, remove now
                 } else {
-                    data[key] = old_val; // Restoring the old value
+                    data[key] = old_val;      // Restoring the old value
                 }
             }
-            transaction_stack.pop();     // Removal after rollback from stack
+            it->second.pop();                 // Removal after rollback from stack
+
+            if(it->second.empty()) {
+                transaction_stacks.erase(it); // Removal of whole stack
+            }
         }
     }
 };
