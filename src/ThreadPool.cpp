@@ -1,4 +1,4 @@
-#include <ThreadPool.h>
+#include "ThreadPool.h"
 
 ThreadPool::ThreadPool(size_t threads) {          // Threadpool constructor
     for(size_t i=0; i<threads; ++i) { // Tranversing the all pool
