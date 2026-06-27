@@ -1,3 +1,0 @@
-C:/Users/HP/OneDrive/Desktop/Coding/LLD/mini_DB/build/CMakeFiles/MiniDB.dir
-C:/Users/HP/OneDrive/Desktop/Coding/LLD/mini_DB/build/CMakeFiles/edit_cache.dir
-C:/Users/HP/OneDrive/Desktop/Coding/LLD/mini_DB/build/CMakeFiles/rebuild_cache.dir
