@@ -35,7 +35,7 @@ bool Database::isTransactionActive () {
     auto id = currentThread();
     auto it = transaction_stacks.find(id);
 
-    // auto& txnStack = transaction_stacks[std::this_thread::get_id()]; omitted becpz this will create a stack if not available
+    // auto& txnStack = transaction_stacks[std::this_thread::get_id()]; omitted becoz this will create a stack if not available
         
     if(it == transaction_stacks.end()) { // if id not found
         return false;
@@ -54,7 +54,7 @@ void Database::set(const std::string& key, const std::string& value) {
         auto it = transaction_stacks.find(id);
 
         if (it != transaction_stacks.end() && !it->second.empty()) {
-            auto& current_txn = it->second.top();                       // If transaction stack is not empty, we are extracting the top one
+            auto& current_txn = it->second.top();                              // If transaction stack is not empty, we are extracting the top one
             if(current_txn.undo_log.find(key) == current_txn.undo_log.end()) { // Not found in logs
                 if(data.find(key) != data.end()) {                             // Found in data
                     current_txn.undo_log[key] = data[key];                     // Backup
@@ -91,7 +91,7 @@ void Database::commit() {
         return;
     }
 
-        // If only one transaction
+    // If only one transaction
     if(it->second.size() == 1) {
         it->second.pop();                 // Remove the top element
 

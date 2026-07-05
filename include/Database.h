@@ -15,15 +15,16 @@ private:
     std::unordered_map<std::string, std::string> data;
 
     // Separate stacks for different threads
-    // std::thread::id is a type used to store 'id'
     std::unordered_map<std::thread::id, std::stack<Transaction>> transaction_stacks;
     std::mutex mtx; 
     Logger& logger;
 
 public:
+
     Database(Logger& logger);
 
     // thread id finder
+    // std::thread::id is a type used to store 'id'
     static std::thread::id currentThread();
 
     void recover();

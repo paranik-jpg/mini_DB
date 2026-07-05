@@ -5,9 +5,9 @@ Logger::Logger(const std::string& filename) {
 }
 
 void Logger::log(const std::string& key, const std::string& val) {
-    std::lock_guard<std::mutex> lock(logMtx); // Only one thread writes at a time
-    logFile << key << "," << val << "\n";
-    logFile.flush();                          // Ensure it actually writes to disk!
+    std::lock_guard<std::mutex> lock(logMtx);  // Only one thread writes at a time
+    logFile << key << "," << val << std::endl;
+    logFile.flush();                           // Ensure it actually writes to disk!
 }
 
 Logger::~Logger() {

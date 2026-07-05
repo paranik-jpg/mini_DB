@@ -5,7 +5,7 @@
 #include <iostream>
 
 std::mutex coutMtx;
-void safePrint(const std::string& msg) { // For clear output in terminal
+void safePrint(const std::string& msg) {           // For clear output in terminal
         std::lock_guard<std::mutex> lock(coutMtx);
         std::cout << msg << std::endl;
 }
@@ -15,12 +15,12 @@ int main() {
     Database mydb(logger);
     ThreadPool pool(std::thread::hardware_concurrency()); // Create the pool of size = cores in the system
 
-    for (int i=1; i<=1000; i++) {
+    for(int i = 1; i <= 1000; i++) {
         pool.enqueue([&mydb, i]() {
-            if(i%3==0) {
+            if(i % 3 == 0) {
                 mydb.begin();
             }
-            else if(i%3==1) {
+            else if(i % 3 == 1) {
                 mydb.set(std::to_string(i), std::to_string(i*i));
             }
             else {

@@ -8,6 +8,7 @@
 class Logger {
     std::ofstream logFile;                        // logFile is a file stream object (write only)
     std::mutex logMtx;
+    
 public:
     Logger(const std::string& filename);
 
