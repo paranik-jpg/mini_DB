@@ -6,7 +6,7 @@ Database::Database(Logger& logger) : logger(logger) {
     recover();
 }
 
-    // thread id finder
+// thread id finder
 std::thread::id Database::currentThread() {
     return std::this_thread::get_id();
 }
@@ -135,15 +135,15 @@ void Database::rollback() {
         // Revert cahnges from the log
         for(auto const& [key, old_val] : current_txn.undo_log) {
             if (old_val == "__DELETE__") {
-                data.erase(key);          // If not present earlier, remove now
+                data.erase(key);             // If not present earlier, remove now
             } else {
-                data[key] = old_val;      // Restoring the old value
+                data[key] = old_val;         // Restoring the old value
             }
         }
-        it->second.pop();                 // Removal after rollback from stack
+        it->second.pop();                    // Removal after rollback from stack
 
         if(it->second.empty()) {
-            transaction_stacks.erase(it); // Removal of whole stack
+            transaction_stacks.erase(it);    // Removal of whole stack
         }
     }
 }

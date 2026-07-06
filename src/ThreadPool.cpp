@@ -14,7 +14,8 @@ ThreadPool::ThreadPool(size_t threads) {          // Threadpool constructor
 
                     if(this->stop && this->tasks.empty()) {
                         return;                              // Terminates the current worker thread
-                    }                              
+                    }
+                                                  
                     task = std::move(this->tasks.front());   // Handed the first task from queue(tasks)
                     this->tasks.pop();                       // Removed that task from tasks
                 }
