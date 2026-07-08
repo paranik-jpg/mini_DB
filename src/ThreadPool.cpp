@@ -4,7 +4,7 @@ ThreadPool::ThreadPool(size_t threads) {          // Threadpool constructor
     for(size_t i = 0; i < threads; ++i) {         // Tranversing the all pool
         workers.emplace_back([this] {             // Capturing the pointer to the current ThreadPool object
             while(true) {
-                std::function<void()> task;       // Temp var where worker stores the task it takes from the queue
+                std::function<void()> task;       // Temp var where worker stores the task it takes from the queue, 'tasks'
                 {
                     std::unique_lock<std::mutex> lock(this->queueMtx);
                     this->cv.wait(lock, [this] {  // Wakes up only if stop is true OR tasks is non-empty

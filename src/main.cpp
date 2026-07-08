@@ -6,8 +6,8 @@
 
 std::mutex coutMtx;
 void safePrint(const std::string& msg) {           // For clear output in terminal
-        std::lock_guard<std::mutex> lock(coutMtx);
-        std::cout << msg << std::endl;
+    std::lock_guard<std::mutex> lock(coutMtx);
+    std::cout << msg << std::endl;
 }
 
 int main() {
@@ -30,6 +30,7 @@ int main() {
         });
     }
 
+    
     // pool.enqueue([&mydb]() {
     //     mydb.set("A", "100");
     //     mydb.begin();
@@ -43,6 +44,7 @@ int main() {
     // pool.enqueue([&mydb]() {
     //     safePrint(mydb.get(std::to_string(70)));
     // });
+
 
     // After this, the ThreadPool will go out of scope, 
     // trigger the destructor, and shut down cleanly.
