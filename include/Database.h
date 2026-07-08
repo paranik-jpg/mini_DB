@@ -16,6 +16,7 @@ private:
 
     // Separate stacks for different threads
     std::unordered_map<std::thread::id, std::stack<Transaction>> transaction_stacks;
+    
     std::mutex mtx; 
     Logger& logger;
 

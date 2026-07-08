@@ -12,12 +12,12 @@ std::thread::id Database::currentThread() {
 }
 
 void Database::recover() {
-    std::ifstream logFile("db.log");
+    std::ifstream tempLogFile("db.log");
     std::string line;
 
     // Lock the mutex because we are modifying 'data' during recovery
     std::lock_guard<std::mutex> lock(mtx);
-    while(std::getline(logFile, line)) {
+    while(std::getline(tempLogFile, line)) {
         std::stringstream ss(line);
         std::string key, value;
 
@@ -132,7 +132,7 @@ void Database::rollback() {
     if(it != transaction_stacks.end() && !it->second.empty()) {
         auto& current_txn = it->second.top(); // If transaction stack is not empty, we are extracting the top one
             
-        // Revert cahnges from the log
+        // Revert changes from the log
         for(auto const& [key, old_val] : current_txn.undo_log) {
             if (old_val == "__DELETE__") {
                 data.erase(key);             // If not present earlier, remove now
