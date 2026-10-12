@@ -1,21 +1,29 @@
-# Build directory
-build/
+# Build directories
+build*/
 
 # CMake generated files
 CMakeCache.txt
+CMakeFiles/
 cmake_install.cmake
 Makefile
 compile_commands.json
 
-# Visual Studio Code
+# Visual Studio Code & Editor metadata
 .vscode/
+*.swp
+*.tmp
+
+# Windows NTFS ADS on WSL
+*:Zone.Identifier
 
 # Executables
 *.exe
+MiniDB
 
 # Object files
 *.obj
 *.o
 
-# Logs
+# Logs and runtime database files
 *.log
+db.log

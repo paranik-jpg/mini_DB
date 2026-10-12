@@ -8,17 +8,22 @@
 #include <string>
 #include <thread>
 #include <stack>
-#include <mutex>
+#include <shared_mutex>
+#include <cstdint>
+#include <sstream>
 
 class Database {
 private:
-    std::unordered_map<std::string, std::string> data;
+ std::unordered_map<std::string, std::string> data;
 
-    // Separate stacks for different threads
-    std::unordered_map<std::thread::id, std::stack<Transaction>> transaction_stacks;
-    
-    std::mutex mtx; 
-    Logger& logger;
+ // Separate stacks for different threads
+ std::unordered_map<std::thread::id, std::stack<Transaction>>
+     transaction_stacks;
+
+ std::shared_mutex mtx;
+ Logger& logger;
+
+ std::uint64_t next_transaction_id = 1;
 
 public:
 
@@ -34,9 +39,11 @@ public:
 
     void set(const std::string& key, const std::string& value);
 
+    void erase(const std::string& key);
+
     std::string get(const std::string& key);
 
-    void commit();
+    bool commit();
 
     // Begin a new transaction
     void begin();

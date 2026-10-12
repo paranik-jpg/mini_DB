@@ -3,50 +3,48 @@
 #include "Database.h"
 
 #include <iostream>
+#include <vector>
+#include <string>
 
 std::mutex coutMtx;
-void safePrint(const std::string& msg) {           // For clear output in terminal
+void safePrint(const std::string& msg) {
     std::lock_guard<std::mutex> lock(coutMtx);
-    std::cout << msg << std::endl;
+    std::cout << msg << '\n';
 }
 
 int main() {
     Logger logger("db.log");
     Database mydb(logger);
-    ThreadPool pool(std::thread::hardware_concurrency()); // Create the pool of size = cores in the system
+    ThreadPool pool(std::thread::hardware_concurrency());
 
-    for(int i = 1; i <= 1000; i++) {
+    // 1. Concurrent Independent Transactions with Commits & Rollbacks
+    for(int i = 1; i <= 200; ++i) {
         pool.enqueue([&mydb, i]() {
-            if(i % 3 == 0) {
+            mydb.begin();
+            mydb.set("user_" + std::to_string(i), std::to_string(i * 10));
+
+            if (i % 2 == 0) {
+                // Nested transaction verification
                 mydb.begin();
-            }
-            else if(i % 3 == 1) {
-                mydb.set(std::to_string(i), std::to_string(i*i));
-            }
-            else {
+                mydb.set("user_" + std::to_string(i), std::to_string(i * 100));
+                mydb.rollback(); // Must revert back to (i * 10)
+
+                mydb.commit();
+                safePrint("Txn " + std::to_string(i) + " committed.");
+            } else {
                 mydb.rollback();
+                safePrint("Txn " + std::to_string(i) + " rolled back.");
             }
-            safePrint("Thread finished task for: " + std::to_string(i));
         });
     }
 
-    
-    // pool.enqueue([&mydb]() {
-    //     mydb.set("A", "100");
-    //     mydb.begin();
-    //     mydb.set("A", "200");
-    //     mydb.set("B", "500");
-    //     mydb.rollback();
-    //     safePrint(mydb.get("A"));
-    //     safePrint(mydb.get("B"));
-    //     });
+    // 2. Concurrent Readers (Verifying optimistic non-blocking read isolation)
+    for(int i = 1; i <= 50; ++i) {
+        pool.enqueue([&mydb, i]() {
+            std::string val = mydb.get("user_" + std::to_string(i));
+            safePrint("Read user_" + std::to_string(i) + " => " + val);
+        });
+    }
 
-    // pool.enqueue([&mydb]() {
-    //     safePrint(mydb.get(std::to_string(70)));
-    // });
-
-
-    // After this, the ThreadPool will go out of scope, 
-    // trigger the destructor, and shut down cleanly.
     return 0;
 }

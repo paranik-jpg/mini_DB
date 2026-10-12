@@ -10,6 +10,13 @@ void Logger::log(const std::string& key, const std::string& val) {
     logFile.flush();                           // Ensure it actually writes to disk!
 }
 
+void Logger::logRecord(const std::string& record) {
+  std::lock_guard<std::mutex> lock(logMtx);
+
+  logFile << record << '\n';
+  logFile.flush();
+}
+
 Logger::~Logger() {
     logFile.close();
 }

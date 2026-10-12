@@ -8,30 +8,51 @@ ThreadPool::ThreadPool(size_t threads) {          // Threadpool constructor
                 {
                     std::unique_lock<std::mutex> lock(this->queueMtx);
                     this->cv.wait(lock, [this] {  // Wakes up only if stop is true OR tasks is non-empty
-                        return this->stop || 
-                        !this->tasks.empty(); 
+                        return this->stop ||
+                        !this->tasks.empty();
                     });
 
                     if(this->stop && this->tasks.empty()) {
                         return;                              // Terminates the current worker thread
                     }
-                                                  
+
                     task = std::move(this->tasks.front());   // Handed the first task from queue(tasks)
                     this->tasks.pop();                       // Removed that task from tasks
                 }
-                task();                                      // Execute the DB operation
+
+                spaceAvailable.notify_one();
+
+                try {
+                  task();  // Execute the operation
+                } catch(const std::exception& e) {
+                  std::cerr << "Task failed:" << e.what() << '\n';
+                } catch(...) {
+                  std::cerr << "Task failed: unknown exception\n";
+                }
             }
         });
     }
 }
 
-void ThreadPool::enqueue(std::function<void()> task) { // Adds new work
-    {
-        std::lock_guard<std::mutex> lock(queueMtx);
-        tasks.push(std::move(task));
+bool ThreadPool::enqueue(                           // Adds new work
+    std::function<void()> task,
+    std::chrono::milliseconds timeout
+) {
+    std::unique_lock<std::mutex> lock(queueMtx);
+
+    bool available = spaceAvailable.wait_for(       // like select statement in Go
+        lock, timeout, [this] { return stop || tasks.size() < maxQueueSize; });
+
+    if (!available || stop) {
+      return false;
     }
 
+    tasks.push(std::move(task));
+
+    lock.unlock();
     cv.notify_one();
+
+    return true;
 }
 
 ThreadPool::~ThreadPool() {        // Threadpool destructor
@@ -41,6 +62,7 @@ ThreadPool::~ThreadPool() {        // Threadpool destructor
     }
 
     cv.notify_all();               // Wake up all threads so they can check the 'stop' flag
+    spaceAvailable.notify_all();
 
     for(std::thread &worker : workers) {
         worker.join();             // Wait for everyone to finish
