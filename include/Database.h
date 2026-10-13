@@ -23,6 +23,11 @@ private:
  std::shared_mutex mtx;
  Logger& logger;
 
+ bool walFailed = false;
+
+ void ensureHealthy() const;
+ void writeWalRecord(const std::string& record);
+
  std::uint64_t next_transaction_id = 1;
 
 public:

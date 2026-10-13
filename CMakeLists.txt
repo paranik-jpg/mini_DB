@@ -36,3 +36,63 @@ if(ENABLE_SANITIZERS)
         -fsanitize=address,undefined
     )
 endif()
+
+
+include(CTest)
+
+if(BUILD_TESTING)
+    add_executable(MiniDB_WAL_Test
+        tests/wal_recovery_test.cpp
+        src/Database.cpp
+        src/Logger.cpp
+        src/Transaction.cpp
+    )
+
+    target_include_directories(MiniDB_WAL_Test PRIVATE include)
+    target_link_libraries(MiniDB_WAL_Test PRIVATE Threads::Threads)
+
+    target_compile_options(MiniDB_WAL_Test PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+    )
+
+    add_executable(MiniDB_TransactionIsolation_Test
+        tests/transaction_isolation_test.cpp
+        src/Database.cpp
+        src/Logger.cpp
+        src/Transaction.cpp
+    )
+
+    target_include_directories(MiniDB_TransactionIsolation_Test PRIVATE include)
+    target_link_libraries(MiniDB_TransactionIsolation_Test PRIVATE Threads::Threads)
+
+    target_compile_options(MiniDB_TransactionIsolation_Test PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+    )
+
+    add_executable(MiniDB_WALFailure_Test
+        tests/wal_failure_test.cpp
+        src/Database.cpp
+        src/Logger.cpp
+        src/Transaction.cpp
+    )
+
+    target_include_directories(MiniDB_WALFailure_Test PRIVATE include)
+    target_link_libraries(MiniDB_WALFailure_Test PRIVATE Threads::Threads)
+
+    target_compile_options(MiniDB_WALFailure_Test PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+    )
+
+    add_test(NAME MiniDB_WAL_Failure COMMAND MiniDB_WALFailure_Test)
+
+    add_test(NAME MiniDB_WAL_Recovery COMMAND MiniDB_WAL_Test)
+
+    add_test(NAME MiniDB_TransactionIsolation COMMAND MiniDB_TransactionIsolation_Test)
+
+endif()
