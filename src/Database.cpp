@@ -211,7 +211,7 @@ void Database::set(const std::string& key, const std::string& value) {
     auto it = transaction_stacks.find(id);
 
     if (it != transaction_stacks.end() && !it->second.empty()) {
-        auto& current_txn = it->second.top();                               // If transaction stack is not empty, we are extracting the top one
+        auto& current_txn = it->second.back();                               // If transaction stack is not empty, we are extracting the top one
 
         // Save the original visible value only once.
         if(current_txn.undo_log.find(key) == current_txn.undo_log.end()) {  // Not found in logs
@@ -219,19 +219,13 @@ void Database::set(const std::string& key, const std::string& value) {
             bool foundPendingValue = false;
 
             // Search active transactions, starting with the innermost.
-            auto txnStack = it->second;
-
-            while (!txnStack.empty()) {
-                const auto& txn = txnStack.top();
-                auto redoIt = txn.redo_log.find(key);
-
-                if (redoIt != txn.redo_log.end()) {
+            for (auto txnIt = it->second.rbegin(); txnIt != it->second.rend(); ++txnIt) {
+                auto redoIt = txnIt->redo_log.find(key);
+                if (redoIt != txnIt->redo_log.end()) {
                     oldValue = redoIt->second;
                     foundPendingValue = true;
                     break;
                 }
-
-                txnStack.pop();
             }
 
             // If no transactions has a pending value, check the database.
@@ -273,27 +267,21 @@ void Database::erase(const std::string& key) {
 
     // Case 1: An active transaction exists.
     if (it != transaction_stacks.end() && !it->second.empty()) {
-        auto& current_txn = it->second.top();
+        auto& current_txn = it->second.back();
 
         // Save the original visible value only once.
         if (current_txn.undo_log.find(key) == current_txn.undo_log.end()) {
           std::optional<std::string> oldValue;
           bool foundPendingValue = false;
 
-          // Search inner-to-outer for a pending value.
-          auto txnStack = it->second;
-
-          while (!txnStack.empty()) {
-            const auto& txn = txnStack.top();
-            auto redoIt = txn.redo_log.find(key);
-
-            if (redoIt != txn.redo_log.end()) {
+          // Search inner-to-outer without copying the transaction history.
+          for (auto txnIt = it->second.rbegin(); txnIt != it->second.rend(); ++txnIt) {
+            auto redoIt = txnIt->redo_log.find(key);
+            if (redoIt != txnIt->redo_log.end()) {
               oldValue = redoIt->second;
               foundPendingValue = true;
               break;
             }
-
-            txnStack.pop();
           }
 
           // Fall back to the actual database.
@@ -325,7 +313,7 @@ void Database::erase(const std::string& key) {
     }
 }
 
-std::string Database::get(const std::string& key) {
+std::optional<std::string> Database::get(const std::string& key) {
     // A transactional read may update the transaction's read set.
     std::lock_guard<std::shared_mutex> lock(mtx);
     ensureHealthy();
@@ -335,21 +323,11 @@ std::string Database::get(const std::string& key) {
 
     if (it != transaction_stacks.end() && !it->second.empty()) {
         // Search from the innermost transaction outward.
-        auto txnStack = it->second;
-
-        while (!txnStack.empty()) {
-            const auto& txn = txnStack.top();
-            auto redoIt = txn.redo_log.find(key);
-
-            if (redoIt != txn.redo_log.end()) {
-                if (redoIt->second.has_value()) {
-                    return *redoIt->second;
-                }
-
-                return "NULL";
+        for (auto txnIt = it->second.rbegin(); txnIt != it->second.rend(); ++txnIt) {
+            auto redoIt = txnIt->redo_log.find(key);
+            if (redoIt != txnIt->redo_log.end()) {
+                return redoIt->second;
             }
-
-            txnStack.pop();
         }
 
         // No pending write shadows this key: record the value
@@ -361,9 +339,9 @@ std::string Database::get(const std::string& key) {
             observedValue = dataIt->second;
         }
 
-        it->second.top().read_set.try_emplace(key, observedValue);
+        it->second.back().read_set.try_emplace(key, observedValue);
 
-        return observedValue.has_value() ? *observedValue : "NULL";
+        return observedValue;
     }
 
     auto dataIt = data.find(key);
@@ -372,7 +350,7 @@ std::string Database::get(const std::string& key) {
         return dataIt->second;
     }
 
-    return "NULL";
+    return std::nullopt;
 }
 
 bool Database::commit() {
@@ -389,14 +367,14 @@ bool Database::commit() {
     }
 
     // Keep the transaction on the stack until its commit succeeds.
-    auto& child = it->second.top();
+    auto& child = it->second.back();
 
     // Nested commit: merge into the parent.
     if (it->second.size() > 1) {
-        Transaction childTxn = std::move(it->second.top());
-        it->second.pop();
+        Transaction childTxn = std::move(it->second.back());
+        it->second.pop_back();
 
-        auto& parent = it->second.top();
+        auto& parent = it->second.back();
 
         // Preserve the parent's original state for rollback.
         for (const auto& [key, oldValue] : childTxn.undo_log) {
@@ -497,7 +475,7 @@ void Database::begin() {
     writeWalRecord("BEGIN," + std::to_string(txn.id));
 
     // Push the transaction onto this thread's stack.
-    transaction_stacks[currentThread()].push(std::move(txn));
+    transaction_stacks[currentThread()].push_back(std::move(txn));
 }
 
 // Rollback to the last transaction
@@ -514,7 +492,7 @@ void Database::rollback() {
     }
 
     // Remove the rolled-back transaction.
-    it->second.pop();
+    it->second.pop_back();
 
     // Remove the thread's entry if no transactions remain.
     if(it->second.empty()) {

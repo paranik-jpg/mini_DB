@@ -32,6 +32,7 @@ int main() {
 
         db.set(specialKey, specialValue);
         db.set("empty-value", "");
+        db.set("literal-NULL", "NULL");
         db.set("to-delete", "temporary");
         db.erase("to-delete");
 
@@ -54,12 +55,21 @@ int main() {
             recovered.get(specialKey) == specialValue,
             "comma/newline key and value survive recovery") && passed;
 
+        const auto emptyValue = recovered.get("empty-value");
         passed = check(
-            recovered.get("empty-value").empty(),
+            emptyValue.has_value() && emptyValue->empty(),
             "empty value survives recovery") && passed;
 
         passed = check(
-            recovered.get("to-delete") == "NULL",
+            recovered.get("literal-NULL") == std::optional<std::string>("NULL"),
+            "literal NULL is distinguishable from a missing key") && passed;
+
+        passed = check(
+            !recovered.get("missing-key").has_value(),
+            "missing key returns nullopt") && passed;
+
+        passed = check(
+            !recovered.get("to-delete").has_value(),
             "committed deletion survives recovery") && passed;
 
         passed = check(
@@ -67,7 +77,7 @@ int main() {
             "committed transaction survives recovery") && passed;
 
         passed = check(
-            recovered.get("uncommitted-transaction") == "NULL",
+            !recovered.get("uncommitted-transaction").has_value(),
             "uncommitted transaction is not recovered") && passed;
     }
 
@@ -84,7 +94,7 @@ int main() {
         Database recovered(logger);
 
         passed = check(
-            recovered.get("test") == "NULL",
+            !recovered.get("test").has_value(),
             "unterminated final COMMIT is ignored") && passed;
     }
 

@@ -7,9 +7,10 @@
 #include <unordered_map>
 #include <string>
 #include <thread>
-#include <stack>
+#include <vector>
 #include <shared_mutex>
 #include <cstdint>
+#include <optional>
 #include <sstream>
 
 class Database {
@@ -17,7 +18,7 @@ private:
  std::unordered_map<std::string, std::string> data;
 
  // Separate stacks for different threads
- std::unordered_map<std::thread::id, std::stack<Transaction>>
+ std::unordered_map<std::thread::id, std::vector<Transaction>>
      transaction_stacks;
 
  std::shared_mutex mtx;
@@ -46,7 +47,7 @@ public:
 
     void erase(const std::string& key);
 
-    std::string get(const std::string& key);
+    std::optional<std::string> get(const std::string& key);
 
     bool commit();
 

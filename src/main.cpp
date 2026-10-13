@@ -41,8 +41,9 @@ int main() {
     // 2. Concurrent Readers (Verifying optimistic non-blocking read isolation)
     for(int i = 1; i <= 50; ++i) {
         pool.enqueue([&mydb, i]() {
-            std::string val = mydb.get("user_" + std::to_string(i));
-            safePrint("Read user_" + std::to_string(i) + " => " + val);
+            auto val = mydb.get("user_" + std::to_string(i));
+            safePrint("Read user_" + std::to_string(i) + " => " +
+                      (val.has_value() ? *val : "<missing>"));
         });
     }
 
