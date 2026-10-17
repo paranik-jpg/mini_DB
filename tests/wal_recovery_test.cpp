@@ -85,7 +85,7 @@ int main() {
     {
         std::ofstream out(WAL, std::ios::trunc);
         out << "BEGIN,900\n";
-        out << "SET2,900,74657374,76616C7565\n";
+        out << "SET,900,74657374,76616C7565\n";
         out << "COMMIT,900"; // Deliberately no trailing newline.
     }
 

@@ -114,21 +114,18 @@ void Database::recover() {
           auto id = std::stoull(idText);
           pendingTransactions.try_emplace(id);
 
+          // Makes sure future new transactions don't accidentally reuse an ID from the past.
           if (id >= next_transaction_id) {
             next_transaction_id = id + 1;
           }
-        } else if (type == "SET" || type == "DELETE" ||
-                   type == "SET2" || type == "DELETE2") {
+        } else if (type == "SET" || type == "DELETE") {
             std::string idText;
-            std::string key;
+            std::string keyHex;
 
             if (!std::getline(ss, idText, ',') ||
-                !std::getline(ss, key, ',')) {
+                !std::getline(ss, keyHex, ',')) {
                 continue;
             }
-
-            const bool encoded = (type == "SET2" || type == "DELETE2");
-            const bool isSet = (type == "SET" || type == "SET2");
 
             auto id = std::stoull(idText);
             auto it = pendingTransactions.find(id);
@@ -137,25 +134,12 @@ void Database::recover() {
                 continue;
             }
 
-            if (encoded) {
-                key = decodeHex(key);
-            }
+            std::string key = decodeHex(keyHex);
 
-            if (isSet) {
-                std::string value;
-
-                if (encoded) {
-                // Hex-encoded records can represent an empty value
-                // as an empty field after the final comma.
-                    std::getline(ss, value);
-                    value = decodeHex(value);
-                } else {
-                    if (!std::getline(ss, value)) {
-                        continue;
-                    }
-                }
-
-                it->second[key] = value;
+            if (type == "SET") {
+                std::string valueHex;
+                std::getline(ss, valueHex);
+                it->second[key] = decodeHex(valueHex);
             } else {
                 it->second[key] = std::nullopt;
             }
@@ -210,7 +194,10 @@ void Database::set(const std::string& key, const std::string& value) {
     auto id = currentThread();
     auto it = transaction_stacks.find(id);
 
+    // Check if the current thread called begin()
     if (it != transaction_stacks.end() && !it->second.empty()) {
+        // CASE 1: Inside an explicit transaction
+        // Buffer into redo_log, do not touch `data` or WAL yet
         auto& current_txn = it->second.back();                               // If transaction stack is not empty, we are extracting the top one
 
         // Save the original visible value only once.
@@ -243,13 +230,14 @@ void Database::set(const std::string& key, const std::string& value) {
         // Store the latest value for eventual commit.
         current_txn.redo_log[key] = value;
     } else {
-        // Create an implicit transaction for a standalone write.
+        // CASE 2: OUTSIDE any transaction (Standalone write)
+        // Autocommit / Implicit Transaction:
         Transaction txn;
         txn.id = next_transaction_id++;
 
         writeWalRecord("BEGIN," + std::to_string(txn.id));
         writeWalRecord(
-            "SET2," + std::to_string(txn.id) + "," +
+            "SET," + std::to_string(txn.id) + "," +
             encodeHex(key) + "," + encodeHex(value)
         );
         writeWalRecord("COMMIT," + std::to_string(txn.id));
@@ -305,7 +293,7 @@ void Database::erase(const std::string& key) {
 
         writeWalRecord("BEGIN," + std::to_string(txn.id));
         writeWalRecord(
-            "DELETE2," + std::to_string(txn.id) + "," + encodeHex(key)
+            "DELETE," + std::to_string(txn.id) + "," + encodeHex(key)
         );
         writeWalRecord("COMMIT," + std::to_string(txn.id));
 
@@ -435,12 +423,12 @@ bool Database::commit() {
     for (const auto& [key, newValue] : child.redo_log) {
         if (newValue.has_value()) {
             writeWalRecord(
-                "SET2," + std::to_string(child.id) + "," +
+                "SET," + std::to_string(child.id) + "," +
                 encodeHex(key) + "," + encodeHex(*newValue)
             );
         } else {
             writeWalRecord(
-                "DELETE2," + std::to_string(child.id) + "," +
+                "DELETE," + std::to_string(child.id) + "," +
                 encodeHex(key)
             );
         }
