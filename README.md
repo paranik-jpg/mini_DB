@@ -108,8 +108,6 @@ int main() {
 - **Fail-stop safety:** If a WAL write or flush fails (e.g. disk full), the database enters a fail-safe mode (`walFailed = true`) to prevent inconsistent state in memory.
 - **Crash recovery:** On startup, `Database::recover()` sequentially replays `db.log`, staging operations in memory and applying only those transactions that completed with a `COMMIT` record. Incomplete or torn transactions at crash are cleanly discarded.
 
-> **Durability note:** Stream flushing (`output->flush()`) transfers buffered data to the operating system buffer cache. To guarantee durability against physical power loss, an explicit `fsync()` / OS sync mechanism can be added.
-
 ### Concurrency and Thread Pool
 
 - **Reader-writer synchronization:** Uses `std::shared_mutex` to allow concurrent reader operations while isolating writers and commit validations.
