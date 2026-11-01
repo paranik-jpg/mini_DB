@@ -219,10 +219,8 @@ Expected result: `0 errors from 0 contexts` and `0 bytes in 0 blocks` in use at 
 | [`docs/WAL_RECOVERY.md`](docs/WAL_RECOVERY.md) | Log record schema, hex encoding, atomic write ordering, and crash recovery state machine. |
 | [`docs/VERIFICATION.md`](docs/VERIFICATION.md) | Build configurations, sanitizer run results, and Valgrind memory leak verification. |
 
-## Current Limitations and Roadmap
+## Current Limitation
 
-- **Range Queries & Phantom Locks:** MiniDB currently optimizes point lookups (`get`, `set`, `erase`). Predicate / range-locking mechanisms would be required for full serializability over multi-key range scans.
-- **Disk Synchronization:** Log durability relies on userspace and OS stream flushing (`flush()`). Implementing kernel-level `fsync()` would guarantee durability across hardware power cuts.
 - **Log Compaction / Checkpointing:** The WAL is append-only. Adding checkpointing will allow truncating historical logs once committed state is persisted.
 
 ## License
