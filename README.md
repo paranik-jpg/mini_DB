@@ -1,6 +1,6 @@
 # MiniDB: Embedded C++17 Transactional Key-Value Engine
 
-MiniDB is an in-memory key-value database engine written in modern C++17. It explores transaction management, optimistic concurrency control (OCC), nested savepoints, write-ahead logging (WAL) with hex encoding, crash recovery, and concurrent task execution through a bounded worker thread pool.
+MiniDB is an in-memory key-value database engine written in modern C++17. It explores transaction management, optimistic concurrency control (OCC) (Transactions check for conflicts only at the time of commit), nested savepoints, write-ahead logging (WAL) with hex encoding, crash recovery, and concurrent task execution through a bounded worker thread pool.
 
 The project emphasizes modular design, resource safety, and understanding the internal mechanisms behind transactional storage engines.
 
