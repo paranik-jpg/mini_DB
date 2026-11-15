@@ -14,15 +14,21 @@
 
 class ThreadPool {
 private:
-    std::vector<std::thread> workers;        // Stores all worker threads
-    std::queue<std::function<void()>> tasks; // Queue of pending jobs (each of which is void)
+    // Stores all worker threads
+    std::vector<std::thread> workers;        
+    // Queue of pending jobs (each of which is void)
+    std::queue<std::function<void()>> tasks; 
 
     std::mutex queueMtx;
-    std::condition_variable cv;             // - Work available
-    std::condition_variable spaceAvailable; // - Queue space available
+
+    // Work available ?!
+    std::condition_variable cv;
+    // Queue space available ?!
+    std::condition_variable spaceAvailable; 
 
     const std::size_t maxQueueSize = 1000;
-    bool stop = false;  // Tells whether the pool is shutting down
+    // Tells whether the pool is shutting down
+    bool stop = false; 
 
    public:
     ThreadPool(size_t threads);
