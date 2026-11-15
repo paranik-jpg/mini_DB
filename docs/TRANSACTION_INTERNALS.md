@@ -9,8 +9,8 @@
 
 ## 2. Nested Transactions & Savepoints
 * **Stack Framing:** Each thread maintains a LIFO stack (`std::stack<Transaction>`) keyed by `std::thread::id`.
-* **Merge Semantics on Commit:** Inner transaction commits merge their changes into the immediate parent frame, preserving the parent's original pre-transaction snapshots.
-* **Rollback Isolation:** Popping an inner frame discards pending mutations and restores key snapshots without aborting the enclosing transaction context.
+* **Merge Semantics on Commit:** When an inner transaction commits, its changes are added to its parent transaction, while the parent's original snapshots are kept unchanged.
+* **Rollback Isolation:** Discarding an inner frame cancels its pending changes and restores saved values without aborting the outer transaction.
 
 ---
 
