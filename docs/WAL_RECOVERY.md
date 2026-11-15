@@ -12,5 +12,5 @@
 
 ## 2. Replay & Crash Recovery State Machine
 * **In-Flight Tracking:** `Database::recover()` reads `db.log` sequentially on boot, tracking active transactions in an in-memory staging table (`pendingTransactions`).
-* **Uncommitted Transaction Discard:** If the process crashes before a `COMMIT` entry is written, staged operations for that transaction ID are discarded, preserving the Atomicity (A) and Durability (D) invariants of ACID.
+* **Uncommitted Transaction Discard:** If the process crashes before a `COMMIT` entry is written, staged operations for that transaction ID are discarded, preserving the Atomicity (A) and Durability (D) of ACID.
 * **Tombstone Replay:** Explicit `DELETE` records replay as `data.erase(key)`, preventing deleted keys from resurrecting during post-crash restarts.
