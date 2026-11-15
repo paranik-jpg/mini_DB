@@ -15,28 +15,26 @@
 
 class Database {
 private:
- std::unordered_map<std::string, std::string> data;
+    std::unordered_map<std::string, std::string> data;
 
- // Separate stacks for different threads
- std::unordered_map<std::thread::id, std::vector<Transaction>>
-     transaction_stacks;
+    // Separate stacks for different threads
+    std::unordered_map<std::thread::id, std::vector<Transaction>> transaction_stacks;
 
- std::shared_mutex mtx;
- Logger& logger;
+    std::shared_mutex mtx;
+    Logger& logger;
 
- bool walFailed = false;
+    bool walFailed = false;
 
- void ensureHealthy() const;
- void writeWalRecord(const std::string& record);
+    void ensureHealthy() const;
+    void writeWalRecord(const std::string& record);
 
- std::uint64_t next_transaction_id = 1;
+    std::uint64_t next_transaction_id = 1;
 
 public:
 
     Database(Logger& logger);
 
-    // thread id finder
-    // std::thread::id is a type used to store 'id'
+    // thread id finder (std::thread::id is a type used to store 'id')
     static std::thread::id currentThread();
 
     void recover();
@@ -51,10 +49,8 @@ public:
 
     bool commit();
 
-    // Begin a new transaction
     void begin();
 
-    // Rollback to the last transaction
     void rollback();
 };
 
