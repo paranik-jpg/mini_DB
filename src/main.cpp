@@ -25,9 +25,11 @@ int main() {
 
             if (i % 2 == 0) {
                 // Nested transaction verification
+                
                 mydb.begin();
                 mydb.set("user_" + std::to_string(i), std::to_string(i * 100));
-                mydb.rollback(); // Must revert back to (i * 10)
+                // Must revert back to (i * 10)
+                mydb.rollback(); 
 
                 mydb.commit();
                 safePrint("Txn " + std::to_string(i) + " committed.");
@@ -42,8 +44,7 @@ int main() {
     for(int i = 1; i <= 50; ++i) {
         pool.enqueue([&mydb, i]() {
             auto val = mydb.get("user_" + std::to_string(i));
-            safePrint("Read user_" + std::to_string(i) + " => " +
-                      (val.has_value() ? *val : "<missing>"));
+            safePrint("Read user_" + std::to_string(i) + " => " + (val.has_value() ? *val : "<missing>"));
         });
     }
 
