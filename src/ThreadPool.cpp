@@ -1,50 +1,57 @@
 #include "ThreadPool.h"
 
-ThreadPool::ThreadPool(size_t threads) {          // Threadpool constructor
-    for(size_t i = 0; i < threads; ++i) {         // Tranversing the all pool
-        workers.emplace_back([this] {             // Capturing the pointer to the current ThreadPool object
+// Constructor
+ThreadPool::ThreadPool(size_t threads) {  
+    // Tranverse the pool
+    for(size_t i = 0; i < threads; ++i) {
+        // Capture the pointer to the current ThreadPool object
+        workers.emplace_back([this] {             
             while(true) {
-                std::function<void()> task;       // Temp var where worker stores the task it takes from the queue, 'tasks'
+                // task => temp var where worker stores the task it takes from the queue
+                std::function<void()> task;       
                 {
                     std::unique_lock<std::mutex> lock(this->queueMtx);
-                    this->cv.wait(lock, [this] {  // Wakes up only if stop is true OR tasks is non-empty
+                    this->cv.wait(lock, [this] {  
                         return this->stop ||
                         !this->tasks.empty();
                     });
 
                     if(this->stop && this->tasks.empty()) {
-                        return;                              // Terminates the current worker thread
+                        // Terminate the current worker thread
+                        return;                              
                     }
 
-                    task = std::move(this->tasks.front());   // Handed the first task from queue(tasks)
-                    this->tasks.pop();                       // Removed that task from tasks
+                    // Hand the first task from queue(tasks)
+                    task = std::move(this->tasks.front());   
+                    this->tasks.pop();                       
                 }
 
                 spaceAvailable.notify_one();
 
                 try {
-                  task();  // Execute the operation
+                    // Execute the operation
+                    task();  
                 } catch(const std::exception& e) {
-                  std::cerr << "Task failed:" << e.what() << '\n';
+                    std::cerr << "Task failed:" << e.what() << '\n';
                 } catch(...) {
-                  std::cerr << "Task failed: unknown exception\n";
+                    std::cerr << "Task failed: unknown exception\n";
                 }
             }
         });
     }
 }
 
-bool ThreadPool::enqueue(                           // Adds new work
-    std::function<void()> task,
-    std::chrono::milliseconds timeout
-) {
+// Adds new work
+bool ThreadPool::enqueue(std::function<void()> task, std::chrono::milliseconds timeout) {
     std::unique_lock<std::mutex> lock(queueMtx);
 
-    bool available = spaceAvailable.wait_for(       // like select statement in Go
-        lock, timeout, [this] { return stop || tasks.size() < maxQueueSize; });
+    // This is like select statements in Go
+    bool available = spaceAvailable.wait_for(lock, timeout, [this] { 
+        return stop || tasks.size() < maxQueueSize; 
+    });
 
     if (!available || stop) {
-      return false;
+        return false;
     }
 
     tasks.push(std::move(task));
@@ -55,16 +62,19 @@ bool ThreadPool::enqueue(                           // Adds new work
     return true;
 }
 
-ThreadPool::~ThreadPool() {        // Threadpool destructor
+// Destructor
+ThreadPool::~ThreadPool() {        
     {
         std::lock_guard<std::mutex> lock(queueMtx);
         stop = true;
     }
 
-    cv.notify_all();               // Wake up all threads so they can check the 'stop' flag
+    // Wake up all threads so they can check the 'stop' flag
+    cv.notify_all();               
     spaceAvailable.notify_all();
 
+    // Wait for everyone to finish
     for(std::thread &worker : workers) {
-        worker.join();             // Wait for everyone to finish
+        worker.join();             
     }
 }
