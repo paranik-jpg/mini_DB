@@ -1,7 +1,6 @@
 #include "Logger.h"
 
-Logger::Logger(const std::string& filename)
-    : filename(filename) {
+Logger::Logger(const std::string& filename) : filename(filename) {
     logFile.open(filename, std::ios::app);
 
     if (!logFile.is_open()) {
@@ -11,8 +10,8 @@ Logger::Logger(const std::string& filename)
     output = &logFile;
 }
 
-Logger::Logger(const std::string& filename, std::ostream& outputOverride)
-    : filename(filename), output(&outputOverride) {}
+Logger::Logger(const std::string& filename, std::ostream& outputOverride) : filename(filename), output(&outputOverride) {
+}
 
 const std::string& Logger::getFilename() const {
     return filename;
