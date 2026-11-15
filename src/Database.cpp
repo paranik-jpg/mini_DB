@@ -469,7 +469,7 @@ void Database::rollback() {
 
     // No active transaction for this thread.
     if(it == transaction_stacks.end() || it->second.empty()) {
-      return;
+        return;
     }
 
     // Remove the rolled-back transaction.
