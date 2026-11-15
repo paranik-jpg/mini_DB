@@ -114,7 +114,7 @@ void Database::recover() {
           auto id = std::stoull(idText);
           pendingTransactions.try_emplace(id);
 
-          // Makes sure future new transactions don't accidentally reuse an ID from the past.
+          // Make sure future new transactions don't accidentally reuse an ID from the past.
           if (id >= next_transaction_id) {
             next_transaction_id = id + 1;
           }
@@ -173,17 +173,18 @@ bool Database::isTransactionActive () {
     std::shared_lock<std::shared_mutex> lock(mtx);
     ensureHealthy();
 
-    // this_thread::get_id() returns current thread's id
     auto id = currentThread();
     auto it = transaction_stacks.find(id);
 
     // auto& txnStack = transaction_stacks[std::this_thread::get_id()]; omitted becoz this will create a stack if not available
 
-    if(it == transaction_stacks.end()) { // if id not found
+    // if id not found
+    if(it == transaction_stacks.end()) { 
         return false;
     }
 
-    return !it->second.empty();          // if id found, check for emptiness
+    // if id found, check for emptiness
+    return !it->second.empty();          
 }
 
 void Database::set(const std::string& key, const std::string& value) {
@@ -198,10 +199,13 @@ void Database::set(const std::string& key, const std::string& value) {
     if (it != transaction_stacks.end() && !it->second.empty()) {
         // CASE 1: Inside an explicit transaction
         // Buffer into redo_log, do not touch `data` or WAL yet
-        auto& current_txn = it->second.back();                               // If transaction stack is not empty, we are extracting the top one
+
+        // If transaction stack is not empty, we are extracting the top one
+        auto& current_txn = it->second.back();                               
 
         // Save the original visible value only once.
-        if(current_txn.undo_log.find(key) == current_txn.undo_log.end()) {  // Not found in logs
+        // Not found in logs!
+        if(current_txn.undo_log.find(key) == current_txn.undo_log.end()) {  
             std::optional<std::string> oldValue;
             bool foundPendingValue = false;
 
@@ -217,11 +221,11 @@ void Database::set(const std::string& key, const std::string& value) {
 
             // If no transactions has a pending value, check the database.
             if (!foundPendingValue) {
-              auto data_it = data.find(key);
+                auto data_it = data.find(key);
 
-              if (data_it != data.end()) {
-                oldValue = data_it->second;
-              }
+                if (data_it != data.end()) {
+                    oldValue = data_it->second;
+                }
             }
 
             current_txn.undo_log[key] = oldValue;
@@ -232,14 +236,12 @@ void Database::set(const std::string& key, const std::string& value) {
     } else {
         // CASE 2: OUTSIDE any transaction (Standalone write)
         // Autocommit / Implicit Transaction:
+        
         Transaction txn;
         txn.id = next_transaction_id++;
 
         writeWalRecord("BEGIN," + std::to_string(txn.id));
-        writeWalRecord(
-            "SET," + std::to_string(txn.id) + "," +
-            encodeHex(key) + "," + encodeHex(value)
-        );
+        writeWalRecord("SET," + std::to_string(txn.id) + "," + encodeHex(key) + "," + encodeHex(value));
         writeWalRecord("COMMIT," + std::to_string(txn.id));
 
         data[key] = value;
@@ -259,42 +261,41 @@ void Database::erase(const std::string& key) {
 
         // Save the original visible value only once.
         if (current_txn.undo_log.find(key) == current_txn.undo_log.end()) {
-          std::optional<std::string> oldValue;
-          bool foundPendingValue = false;
+            std::optional<std::string> oldValue;
+            bool foundPendingValue = false;
 
           // Search inner-to-outer without copying the transaction history.
-          for (auto txnIt = it->second.rbegin(); txnIt != it->second.rend(); ++txnIt) {
+            for (auto txnIt = it->second.rbegin(); txnIt != it->second.rend(); ++txnIt) {
             auto redoIt = txnIt->redo_log.find(key);
             if (redoIt != txnIt->redo_log.end()) {
-              oldValue = redoIt->second;
-              foundPendingValue = true;
-              break;
+                oldValue = redoIt->second;
+                foundPendingValue = true;
+                break;
             }
-          }
+        }
 
           // Fall back to the actual database.
-          if (!foundPendingValue) {
+        if (!foundPendingValue) {
             auto dataIt = data.find(key);
 
             if (dataIt != data.end()) {
                 oldValue = dataIt->second;
             }
-          }
-
-          current_txn.undo_log[key] = oldValue;
         }
+
+        current_txn.undo_log[key] = oldValue;
+    }
 
         // nullopt represents a pending deletion.
         current_txn.redo_log[key] = std::nullopt;
     } else {
         // Create an implicit transaction for a standalone deletion.
+        
         Transaction txn;
         txn.id = next_transaction_id++;
 
         writeWalRecord("BEGIN," + std::to_string(txn.id));
-        writeWalRecord(
-            "DELETE," + std::to_string(txn.id) + "," + encodeHex(key)
-        );
+        writeWalRecord("DELETE," + std::to_string(txn.id) + "," + encodeHex(key));
         writeWalRecord("COMMIT," + std::to_string(txn.id));
 
         data.erase(key);
@@ -303,6 +304,7 @@ void Database::erase(const std::string& key) {
 
 std::optional<std::string> Database::get(const std::string& key) {
     // A transactional read may update the transaction's read set.
+    
     std::lock_guard<std::shared_mutex> lock(mtx);
     ensureHealthy();
 
@@ -318,8 +320,7 @@ std::optional<std::string> Database::get(const std::string& key) {
             }
         }
 
-        // No pending write shadows this key: record the value
-        // observed from the committed database.
+        // No pending write shadows this key: record the value observed from the committed database.
         std::optional<std::string> observedValue;
         auto dataIt = data.find(key);
 
@@ -371,8 +372,7 @@ bool Database::commit() {
             }
         }
 
-        // Merge the child's observed values without overwriting
-        // observations already made by the parent.
+        // Merge the child's observed values without overwriting observations already made by the parent.
         for (const auto& [key, observedValue] : childTxn.read_set) {
             parent.read_set.try_emplace(key, observedValue);
         }
@@ -396,8 +396,7 @@ bool Database::commit() {
         }
 
         if (currentValue != observedValue) {
-            // A value read by this transaction has changed.
-            // Abort the transaction rather than commit stale decisions.
+            // A value read by this transaction has changed. Abort the transaction rather than commit stale decisions.
             transaction_stacks.erase(it);
             return false;
         }
@@ -405,32 +404,26 @@ bool Database::commit() {
 
     // Validate before committing.
     for (const auto& [key, oldValue] : child.undo_log) {
-      std::optional<std::string> currentValue;
+        std::optional<std::string> currentValue;
 
-      auto dataIt = data.find(key);
-      if (dataIt != data.end()) {
-        currentValue = dataIt->second;
-      }
+        auto dataIt = data.find(key);
+        if (dataIt != data.end()) {
+            currentValue = dataIt->second;
+        }
 
-      if (currentValue != oldValue) {
-        // Conflict detected: discard this transaction.
-        transaction_stacks.erase(it);
-        return false;
-      }
+        if (currentValue != oldValue) {
+            // Conflict detected: discard this transaction.
+            transaction_stacks.erase(it);
+            return false;
+        }
     }
 
     // Log the final changes of the outermost transaction.
     for (const auto& [key, newValue] : child.redo_log) {
         if (newValue.has_value()) {
-            writeWalRecord(
-                "SET," + std::to_string(child.id) + "," +
-                encodeHex(key) + "," + encodeHex(*newValue)
-            );
+            writeWalRecord("SET," + std::to_string(child.id) + "," + encodeHex(key) + "," + encodeHex(*newValue));
         } else {
-            writeWalRecord(
-                "DELETE," + std::to_string(child.id) + "," +
-                encodeHex(key)
-            );
+            writeWalRecord("DELETE," + std::to_string(child.id) + "," + encodeHex(key));
         }
     }
 
@@ -440,9 +433,9 @@ bool Database::commit() {
     // Apply the committed changes.
     for (const auto& [key, newValue] : child.redo_log) {
         if (newValue.has_value()) {
-          data[key] = *newValue;
+            data[key] = *newValue;
         } else {
-          data.erase(key);
+            data.erase(key);
         }
     }
 
