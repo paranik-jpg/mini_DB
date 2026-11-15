@@ -15,10 +15,9 @@ class Logger {
     std::ostream* output = nullptr;
 
 public:
-    // Existing constructor remains unchanged.
     Logger(const std::string& filename);
 
-    // Allows tests to inject a failing output stream.
+    // Allow tests to inject a failing output stream.
     Logger(const std::string& filename, std::ostream& outputOverride);
 
     const std::string& getFilename() const;
